@@ -9,12 +9,20 @@
 #include <time.h>
 #include <errno.h>
 #include <string.h>
-#include "useful.h"
+#include <useful.h>
 
-//#include <curl\curl.h>
+#include <curl/curl.h>
 
 int **contacts;
 int *indexes;
+
+void end_free(void) {
+	free(indexes);
+	for (int i = 0; i < 13; i++) {
+		free(contacts[i]);
+	}
+	free(contacts);
+}
 
 int contacts_parser(void) {
 	FILE *subscriber = fopen("./quaker.json", "r");
@@ -43,10 +51,10 @@ int contacts_parser(void) {
 		free(s);
 		while (reader(subscriber, &s, 16));
 
-		while(1) {
+		while (1) {
 			chat_id = 0, position = 0;
 			while (s[position] <= '0' || s[position] >= '9') position++;
-			while(1) {
+			while (1) {
 				chat_id = chat_id * 10 + (s[position] - '0');
 				if (s[++position] == ',') break;
 				else if (s[position] == '\0') break;
@@ -83,7 +91,11 @@ int main(void) {
 	}
 	indexes = malloc(13 * sizeof(int));
 
-	contacts_parser();
+	if (contacts_parser() == EXIT_FAILURE) {
+		fprintf(stderr, "Failed to parse subscribers\n");
+		end_free();
+		return 0;
+	}
 
 	for (int i = 0; i < 13; i++) {
 
@@ -97,15 +109,19 @@ int main(void) {
 		puts("");
 	}
 
-	/*if (curl_global_init(CURL_GLOBAL_ALL)) {	// Init the library
+	puts("Init...");
+
+	if (curl_global_init(CURL_GLOBAL_ALL)) {	// Init the library
 		fprintf(stderr, "Boh non è partito\n");
 		exit(EXIT_FAILURE);
 	}
 	CURL *easyhandle;
-	if (easyhandle = curl_easy_init()) {	// Init a handle which will be used for every connection
+	if (!(easyhandle = curl_easy_init())) {	// Init a handle which will be used for every connection
 		fprintf(stderr, "Boh non è partito easy\n");
 		exit(EXIT_FAILURE);
 	}
+
+	puts("Handle initiated");
 
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
@@ -113,17 +129,16 @@ int main(void) {
 	char *URL = malloc((bufsz + 1) * sizeof(char));
 	sprintf(URL, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%d-%dT%d%%3A00%%3A00&endtime=%d-%d-%dT%d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour - 1, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour);
 
-	curl_easy_setopt(easyhandle, CURLOPT_URL, "http://domain.com/");
+	curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
+
+	int success = curl_easy_perform(easyhandle);
+	printf("libcURL returned with code %d\n", success);
 
 	puts("Cleanup");
 	curl_easy_cleanup(easyhandle);
-	curl_global_cleanup();*/
+	curl_global_cleanup();
 
-	free(indexes);
-	for (int i = 0; i < 13; i++) {
-		free(contacts[i]);
-	}
-	free(contacts);
+	end_free();
 
 	return 0;
 }
