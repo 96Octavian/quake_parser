@@ -15,6 +15,7 @@
 typedef struct MemoryStruct {
 	char *memory;
 	size_t size;
+	int res;
 } MemoryStruct;
 
 int **contacts;
@@ -93,6 +94,19 @@ int contacts_parser(void) {
 	return EXIT_SUCCESS;
 }
 
+void print_subscribers(void) {
+	for (int i = 0; i < 13; i++) {
+		printf("Magnitude %d, %d subscribers", i, indexes[i]);
+		if (indexes[i]) {
+			printf("\n\t");
+			for (int j = 0; j < indexes[i]; j++) {
+				printf("%d ", contacts[i][j]);
+			}
+		}
+		puts("");
+	}
+}
+
 size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
 	size_t realsize = size * nmemb;
 	struct MemoryStruct *mem = (struct MemoryStruct *)userp;
@@ -111,30 +125,8 @@ size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *user
 
 	return realsize;
 }
-int main(void) {
 
-	contacts = malloc(13 * sizeof(int *));
-	for (int i = 0; i < 13; i++) {
-		contacts[i] = malloc(sizeof(int));
-	}
-	indexes = malloc(13 * sizeof(int));
-
-	if (contacts_parser() == EXIT_FAILURE) {
-		fprintf(stderr, "Failed to parse subscribers\n");
-		end_free();
-		return 0;
-	}
-
-	/*for (int i = 0; i < 13; i++) {
-		printf("Magnitude %d, %d subscribers", i, indexes[i]);
-		if (indexes[i]) {
-			printf("\n\t");
-			for (int j = 0; j < indexes[i]; j++) {
-				printf("%d ", contacts[i][j]);
-			}
-		}
-		puts("");
-	}*/
+MemoryStruct getter(void) {
 
 	printf("Init... ");
 
@@ -171,9 +163,31 @@ int main(void) {
 
 	curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
 
-	int success = curl_easy_perform(easyhandle);
-	printf("libcURL returned with code %d\n", success);
-	printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
+	chunk.res = curl_easy_perform(easyhandle);
+
+	return chunk;
+
+}
+
+int main(void) {
+
+	contacts = malloc(13 * sizeof(int *));
+	for (int i = 0; i < 13; i++) {
+		contacts[i] = malloc(sizeof(int));
+	}
+	indexes = malloc(13 * sizeof(int));
+
+	if (contacts_parser() == EXIT_FAILURE) {
+		fprintf(stderr, "Failed to parse subscribers\n");
+		end_free();
+		return 0;
+	}
+	print_subscribers();
+
+	MemoryStruct quakes = getter();
+
+	printf("libcURL returned with code %d\n", quakes.res);
+	printf("%lu bytes retrieved\n", (unsigned long)quakes.size);
 
 	end_free();
 
