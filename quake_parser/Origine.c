@@ -12,11 +12,21 @@
 #include <useful.h>
 
 #include <curl/curl.h>
+typedef struct MemoryStruct {
+	char *memory;
+	size_t size;
+} MemoryStruct;
 
 int **contacts;
 int *indexes;
+CURL *easyhandle;
 
 void end_free(void) {
+	puts("Cleanup");
+
+	curl_easy_cleanup(easyhandle);
+	curl_global_cleanup();
+
 	free(indexes);
 	for (int i = 0; i < 13; i++) {
 		free(contacts[i]);
@@ -83,6 +93,24 @@ int contacts_parser(void) {
 	return EXIT_SUCCESS;
 }
 
+size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+	size_t realsize = size * nmemb;
+	struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+	char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+	if (ptr == NULL) {
+		/* out of memory! */
+		printf("Not enough memory (realloc returned NULL)\n");
+		return 0;
+	}
+
+	mem->memory = ptr;
+	memcpy(&(mem->memory[mem->size]), contents, realsize);
+	mem->size += realsize;
+	mem->memory[mem->size] = 0;
+
+	return realsize;
+}
 int main(void) {
 
 	contacts = malloc(13 * sizeof(int *));
@@ -97,8 +125,7 @@ int main(void) {
 		return 0;
 	}
 
-	for (int i = 0; i < 13; i++) {
-
+	/*for (int i = 0; i < 13; i++) {
 		printf("Magnitude %d, %d subscribers", i, indexes[i]);
 		if (indexes[i]) {
 			printf("\n\t");
@@ -107,15 +134,14 @@ int main(void) {
 			}
 		}
 		puts("");
-	}
+	}*/
 
-	puts("Init...");
+	printf("Init... ");
 
 	if (curl_global_init(CURL_GLOBAL_ALL)) {	// Init the library
 		fprintf(stderr, "Boh non è partito\n");
 		exit(EXIT_FAILURE);
 	}
-	CURL *easyhandle;
 	if (!(easyhandle = curl_easy_init())) {	// Init a handle which will be used for every connection
 		fprintf(stderr, "Boh non è partito easy\n");
 		exit(EXIT_FAILURE);
@@ -124,19 +150,30 @@ int main(void) {
 	puts("Handle initiated");
 
 	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
-	size_t bufsz = snprintf(NULL, 0, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%d-%dT%d%%3A00%%3A00&endtime=%d-%d-%dT%d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour - 1, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour);
+	struct tm endtime = *localtime(&t);
+	struct tm starttime = endtime;
+	starttime.tm_hour--;
+	mktime(&starttime);
+	printf("Start time: %d/%d/%d - %d:%d:%d\n", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, starttime.tm_min, starttime.tm_sec);
+	size_t bufsz = snprintf(NULL, 0, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%02d-%02dT%02d%%3A00%%3A00&endtime=%d-%02d-%02dT%02d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, endtime.tm_year + 1900, endtime.tm_mon + 1, endtime.tm_mday, endtime.tm_hour);
 	char *URL = malloc((bufsz + 1) * sizeof(char));
-	sprintf(URL, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%d-%dT%d%%3A00%%3A00&endtime=%d-%d-%dT%d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour - 1, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour);
+	sprintf(URL, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%02d-%02dT%02d%%3A00%%3A00&endtime=%d-%02d-%02dT%02d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, endtime.tm_year + 1900, endtime.tm_mon + 1, endtime.tm_mday, endtime.tm_hour);
 
 	curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
 
+	printf("URL set: %s\n", URL);
+
+	MemoryStruct chunk;
+	chunk.memory = malloc(1);
+	chunk.size = 0;
+
+	curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+
+	curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
+
 	int success = curl_easy_perform(easyhandle);
 	printf("libcURL returned with code %d\n", success);
-
-	puts("Cleanup");
-	curl_easy_cleanup(easyhandle);
-	curl_global_cleanup();
+	printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
 
 	end_free();
 
