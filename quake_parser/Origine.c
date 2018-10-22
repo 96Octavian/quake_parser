@@ -264,6 +264,7 @@ int quake_parser(MemoryStruct quakes) {
 			&year, &month, &day, &hour, &minute, &magnitude, location);
 		s += (strlen(s) + 1);
 
+		// TODO: Send messages to contacts, grouped by magnitude
 		if ((int)magnitude == 6) {
 
 			size_t bufsz = snprintf(NULL, 0, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
