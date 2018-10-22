@@ -12,6 +12,7 @@
 #include <useful.h>
 
 #include <curl/curl.h>
+
 typedef struct MemoryStruct {
 	char *memory;
 	size_t size;
@@ -155,7 +156,7 @@ MemoryStruct quakes_getter(void) {
 
 	curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
 
-	printf("URL set: %s\n", URL);
+	//printf("URL set: %s\n", URL);
 
 	MemoryStruct chunk;
 	chunk.memory = malloc(1);
@@ -174,7 +175,8 @@ MemoryStruct quakes_getter(void) {
 void url_encoder(char **original) {
 	int i = 0, j = 0, count = 0;
 	while ((*original)[i] != '\0') {
-		if ((*original)[i] == ' ') count++;
+		if ((*original)[i] == ' '|| (*original)[i] == ':' || (*original)[i] == '/' || (*original)[i] == ',' || (*original)[i] == '[' || (*original)[i] == ']') count++;
+		else if ((*original)[i] == '\n') count--;
 		i++;
 	}
 	char *newstring = malloc((strlen(*original) + 2 * count + 1) * sizeof(char));
@@ -234,6 +236,9 @@ void url_encoder(char **original) {
 			newstring[j] = 'D';
 			j++;
 		}
+		else if ((*original)[i] == '\n') {
+			i++;
+		}
 		else {
 			newstring[j] = (*original)[i];
 			i++;
@@ -260,12 +265,11 @@ int quake_parser(MemoryStruct quakes) {
 		s += (strlen(s) + 1);
 
 		if ((int)magnitude == 6) {
-			puts("Check");
 
 			size_t bufsz = snprintf(NULL, 0, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
 			char *text = malloc((bufsz + 1) * sizeof(char));
 			sprintf(text, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
-			printf("Text will be:\n%s\n", text);
+			printf("Entry:\n%s", text);
 
 			url_encoder(&text);
 
@@ -273,16 +277,17 @@ int quake_parser(MemoryStruct quakes) {
 			char *URL = malloc((bufsz + 1) * sizeof(char));
 			sprintf(URL, "%s%s%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=66441008&text=", text);
 			curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
-			printf("URL set: %s\n", URL);
+			//printf("URL set: %s", URL);
 
 			chunk.memory = malloc(1);
 			chunk.size = 0;
 			curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 			curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
-			curl_easy_setopt(easyhandle, CURLOPT_VERBOSE, 1);
+			//curl_easy_setopt(easyhandle, CURLOPT_VERBOSE, 1);
 
 			chunk.res = curl_easy_perform(easyhandle);
-			printf("Response:\n%s\nSize: %d - code %d\n", chunk.memory, chunk.size, chunk.res);
+			if (chunk.res == CURLE_OK) puts("Sent.\n");
+			else printf("Returned with errorcode %d\n", chunk.res);
 			free(text);
 			free(URL);
 			free(chunk.memory);
@@ -316,8 +321,8 @@ int main(void) {
 
 	MemoryStruct quakes = quakes_getter();
 
-	printf("libcURL returned with code %d\n", quakes.res);
-	printf("%lu bytes retrieved\n", (unsigned long)quakes.size);
+	//printf("libcURL returned with code %d\n", quakes.res);
+	//printf("%lu bytes retrieved\n", (unsigned long)quakes.size);
 
 	quake_parser(quakes);
 
