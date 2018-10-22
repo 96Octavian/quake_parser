@@ -126,7 +126,7 @@ size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *user
 	return realsize;
 }
 
-MemoryStruct getter(void) {
+MemoryStruct quakes_getter(void) {
 
 	printf("Init... ");
 
@@ -145,6 +145,8 @@ MemoryStruct getter(void) {
 	struct tm endtime = *localtime(&t);
 	struct tm starttime = endtime;
 	starttime.tm_hour--;
+	//remove!
+	starttime.tm_mday--;
 	mktime(&starttime);
 	printf("Start time: %d/%d/%d - %d:%d:%d\n", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, starttime.tm_min, starttime.tm_sec);
 	size_t bufsz = snprintf(NULL, 0, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%02d-%02dT%02d%%3A00%%3A00&endtime=%d-%02d-%02dT%02d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, endtime.tm_year + 1900, endtime.tm_mon + 1, endtime.tm_mday, endtime.tm_hour);
@@ -169,7 +171,90 @@ MemoryStruct getter(void) {
 
 }
 
+void url_encoder(char **original) {
+	int i = 0, j = 0, count = 0;
+	while ((*original)[i] != '\0') {
+		if ((*original)[i] == ' ') count++;
+		i++;
+	}
+	char *newstring = malloc((strlen(*original) + 2 * count + 1) * sizeof(char));
+	i = 0;
+	while ((*original)[i] != '\0') {
+		if ((*original)[i] == ' ') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '2';
+			j++;
+			newstring[j] = '0';
+			j++;
+		}
+		else {
+			newstring[j] = (*original)[i];
+			i++;
+			j++;
+		}
+	}
+	free(*original);
+	*original = newstring;
+}
+
+int quake_parser(MemoryStruct quakes) {
+	for (int i = 0; i <= quakes.size; i++) {
+		if (quakes.memory[i] == '\n') quakes.memory[i] = '\0';
+	}
+	char *s = quakes.memory;
+	s += (strlen(s) + 1);
+	MemoryStruct chunk;
+	while (strlen(s)) {
+		int year, month, day, hour, minute;
+		char *location = calloc(100, sizeof(char));
+		float magnitude;
+		sscanf(s, "%*d|%d-%d-%dT%d:%d:%*f|%*f|%*f|%*f|%*[^||||]||||%*[^|]|%f|--|%[^\t\n]", \
+			&year, &month, &day, &hour, &minute, &magnitude, location);
+		s += (strlen(s) + 1);
+
+		if ((int)magnitude == 6) {
+			puts("Check");
+
+			size_t bufsz = snprintf(NULL, 0, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
+			char *text = malloc((bufsz + 1) * sizeof(char));
+			sprintf(text, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
+			printf("Text will be:\n%s\n", text);
+
+			url_encoder(&text);
+
+			bufsz = snprintf(NULL, 0, "%s%s%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=66441008&text=", text);
+			char *URL = malloc((bufsz + 1) * sizeof(char));
+			sprintf(URL, "%s%s%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=66441008&text=", text);
+			curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
+			printf("URL set: %s\n", URL);
+
+			chunk.memory = malloc(1);
+			chunk.size = 0;
+			curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+			curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
+			curl_easy_setopt(easyhandle, CURLOPT_VERBOSE, 1);
+
+			chunk.res = curl_easy_perform(easyhandle);
+			printf("Response:\n%s\nSize: %d - code %d\n", chunk.memory, chunk.size, chunk.res);
+			free(text);
+			free(URL);
+			free(chunk.memory);
+
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
 int main(void) {
+
+#ifndef TOKEN
+	fprintf(stderr, "No TOKEN specified!\n");
+	return EXIT_FAILURE;
+#endif // !TOKEN
+
 
 	contacts = malloc(13 * sizeof(int *));
 	for (int i = 0; i < 13; i++) {
@@ -182,12 +267,14 @@ int main(void) {
 		end_free();
 		return 0;
 	}
-	print_subscribers();
+	//print_subscribers();
 
-	MemoryStruct quakes = getter();
+	MemoryStruct quakes = quakes_getter();
 
 	printf("libcURL returned with code %d\n", quakes.res);
 	printf("%lu bytes retrieved\n", (unsigned long)quakes.size);
+
+	quake_parser(quakes);
 
 	end_free();
 
