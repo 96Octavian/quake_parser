@@ -256,6 +256,9 @@ int quake_parser(MemoryStruct quakes) {
 	char *s = quakes.memory;
 	s += (strlen(s) + 1);
 	MemoryStruct chunk;
+	curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+	curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
+
 	while (strlen(s)) {
 		int year, month, day, hour, minute;
 		char *location = calloc(100, sizeof(char));
@@ -265,7 +268,7 @@ int quake_parser(MemoryStruct quakes) {
 		s += (strlen(s) + 1);
 
 		// TODO: Send messages to contacts, grouped by magnitude
-		if ((int)magnitude == 6) {
+		/*if ((int)magnitude == 6) {
 
 			size_t bufsz = snprintf(NULL, 0, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
 			char *text = malloc((bufsz + 1) * sizeof(char));
@@ -282,8 +285,8 @@ int quake_parser(MemoryStruct quakes) {
 
 			chunk.memory = malloc(1);
 			chunk.size = 0;
-			curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-			curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
+			//curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+			//curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
 			//curl_easy_setopt(easyhandle, CURLOPT_VERBOSE, 1);
 
 			chunk.res = curl_easy_perform(easyhandle);
@@ -293,7 +296,39 @@ int quake_parser(MemoryStruct quakes) {
 			free(URL);
 			free(chunk.memory);
 
+		}*/
+
+		size_t bufsz = snprintf(NULL, 0, "%d/%d/%d alle %d:%02d: magnitudine %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
+		char *text = malloc((bufsz + 1) * sizeof(char));
+		sprintf(text, "%d/%d/%d alle %d:%02d: magnitudine %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
+		printf("Entry:\n%s", text);
+
+		url_encoder(&text);
+
+
+		for (int i = ((int)magnitude < 13) ? (int)magnitude : 12; i >= 0; i--) {
+			printf("Index at %d\n", i);
+			for (int j = 0; j < indexes[i]; j++) {
+
+				bufsz = snprintf(NULL, 0, "%s%s%s%d%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=", contacts[i][j], "&text=", text);
+				char *URL = malloc((bufsz + 1) * sizeof(char));
+				sprintf(URL, "%s%s%s%d%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=", contacts[i][j], "&text=", text);
+				curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
+				printf("Sending to %d, %d... ", contacts[i][j], j);
+
+				chunk.memory = malloc(1);
+				chunk.size = 0;
+
+				//chunk.res = curl_easy_perform(easyhandle);
+				chunk.res = CURLE_OK;
+				if (chunk.res == CURLE_OK) puts("Sent.\n");
+				else printf("Returned with errorcode %d\n", chunk.res);
+				free(URL);
+				free(chunk.memory);
+				getchar();
+			}
 		}
+		free(text);
 	}
 
 	return EXIT_SUCCESS;
