@@ -189,6 +189,51 @@ void url_encoder(char **original) {
 			newstring[j] = '0';
 			j++;
 		}
+		else if ((*original)[i] == ':') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '3';
+			j++;
+			newstring[j] = 'A';
+			j++;
+		}
+		else if ((*original)[i] == '/') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '2';
+			j++;
+			newstring[j] = 'F';
+			j++;
+		}
+		else if ((*original)[i] == ',') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '2';
+			j++;
+			newstring[j] = 'C';
+			j++;
+		}
+		else if ((*original)[i] == '[') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '5';
+			j++;
+			newstring[j] = 'B';
+			j++;
+		}
+		else if ((*original)[i] == ']') {
+			i++;
+			newstring[j] = '%';
+			j++;
+			newstring[j] = '5';
+			j++;
+			newstring[j] = 'D';
+			j++;
+		}
 		else {
 			newstring[j] = (*original)[i];
 			i++;
