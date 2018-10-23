@@ -146,8 +146,7 @@ MemoryStruct quakes_getter(void) {
 	struct tm endtime = *localtime(&t);
 	struct tm starttime = endtime;
 	starttime.tm_hour--;
-	//remove!
-	starttime.tm_mday--;
+
 	mktime(&starttime);
 	printf("Start time: %d/%d/%d - %d:%d:%d\n", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, starttime.tm_min, starttime.tm_sec);
 	size_t bufsz = snprintf(NULL, 0, "http://webservices.ingv.it/fdsnws/event/1/query?starttime=%d-%02d-%02dT%02d%%3A00%%3A00&endtime=%d-%02d-%02dT%02d%%3A59%%3A59&maxmag=20&orderby=time-asc&format=text&limit=15000", starttime.tm_year + 1900, starttime.tm_mon + 1, starttime.tm_mday, starttime.tm_hour, endtime.tm_year + 1900, endtime.tm_mon + 1, endtime.tm_mday, endtime.tm_hour);
@@ -267,37 +266,6 @@ int quake_parser(MemoryStruct quakes) {
 			&year, &month, &day, &hour, &minute, &magnitude, location);
 		s += (strlen(s) + 1);
 
-		// TODO: Send messages to contacts, grouped by magnitude
-		/*if ((int)magnitude == 6) {
-
-			size_t bufsz = snprintf(NULL, 0, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
-			char *text = malloc((bufsz + 1) * sizeof(char));
-			sprintf(text, "%d/%d/%d at %d:%02d: magnitude %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
-			printf("Entry:\n%s", text);
-
-			url_encoder(&text);
-
-			bufsz = snprintf(NULL, 0, "%s%s%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=66441008&text=", text);
-			char *URL = malloc((bufsz + 1) * sizeof(char));
-			sprintf(URL, "%s%s%s%s", "https://api.telegram.org/bot", TOKEN, "/sendMessage?chat_id=66441008&text=", text);
-			curl_easy_setopt(easyhandle, CURLOPT_URL, URL);
-			//printf("URL set: %s", URL);
-
-			chunk.memory = malloc(1);
-			chunk.size = 0;
-			//curl_easy_setopt(easyhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-			//curl_easy_setopt(easyhandle, CURLOPT_WRITEDATA, (void *)&chunk);
-			//curl_easy_setopt(easyhandle, CURLOPT_VERBOSE, 1);
-
-			chunk.res = curl_easy_perform(easyhandle);
-			if (chunk.res == CURLE_OK) puts("Sent.\n");
-			else printf("Returned with errorcode %d\n", chunk.res);
-			free(text);
-			free(URL);
-			free(chunk.memory);
-
-		}*/
-
 		size_t bufsz = snprintf(NULL, 0, "%d/%d/%d alle %d:%02d: magnitudine %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
 		char *text = malloc((bufsz + 1) * sizeof(char));
 		sprintf(text, "%d/%d/%d alle %d:%02d: magnitudine %.1f, %s\n", year, month, day, hour, minute, magnitude, location);
@@ -305,7 +273,7 @@ int quake_parser(MemoryStruct quakes) {
 
 		url_encoder(&text);
 
-
+		// TODO: Avoid duplicate messages
 		for (int i = ((int)magnitude < 13) ? (int)magnitude : 12; i >= 0; i--) {
 			printf("Index at %d\n", i);
 			for (int j = 0; j < indexes[i]; j++) {
@@ -319,13 +287,11 @@ int quake_parser(MemoryStruct quakes) {
 				chunk.memory = malloc(1);
 				chunk.size = 0;
 
-				//chunk.res = curl_easy_perform(easyhandle);
-				chunk.res = CURLE_OK;
+				chunk.res = curl_easy_perform(easyhandle);
 				if (chunk.res == CURLE_OK) puts("Sent.\n");
 				else printf("Returned with errorcode %d\n", chunk.res);
 				free(URL);
 				free(chunk.memory);
-				getchar();
 			}
 		}
 		free(text);
