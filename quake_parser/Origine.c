@@ -11,6 +11,8 @@
 #include <string.h>
 #include <useful.h>
 
+#include <zlog.h>
+
 #include <curl/curl.h>
 
 typedef struct MemoryStruct {
@@ -37,7 +39,7 @@ void end_free(void) {
 }
 
 int contacts_parser(void) {
-	FILE *subscriber = fopen("./quaker.json", "r");
+	FILE *subscriber = fopen("/home/octavian/bots/Boya/files/quaker.json", "r");
 	if (!subscriber) {
 		fprintf(stderr, "File not opened, errno %d - %s\n", errno, strerror(errno));
 		return EXIT_FAILURE;
@@ -302,6 +304,24 @@ int quake_parser(MemoryStruct quakes) {
 
 int main(void) {
 
+	int rc;
+	zlog_category_t *c;
+
+	rc = zlog_init("/home/octavian/zlog.conf");
+	if (rc) {
+		fprintf(stderr, "Init failed\n");
+		return -1;
+	}
+
+	c = zlog_get_category("my_cat");
+	if (!c) {
+		fprintf(stderr, "Get cat fail\n");
+		zlog_fini();
+		return -2;
+	}
+
+	zlog_info(c, "Call started...");
+
 #ifndef TOKEN
 	fprintf(stderr, "No TOKEN specified!\n");
 	return EXIT_FAILURE;
@@ -329,6 +349,8 @@ int main(void) {
 	quake_parser(quakes);
 
 	end_free();
+
+	zlog_fini();
 
 	return 0;
 }
