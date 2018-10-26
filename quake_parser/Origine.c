@@ -307,7 +307,7 @@ int main(void) {
 	int rc;
 	zlog_category_t *c;
 
-	rc = zlog_init("/home/octavian/zlog.conf");
+	rc = zlog_init("./zlog.conf");
 	if (rc) {
 		fprintf(stderr, "Init failed\n");
 		return -1;
